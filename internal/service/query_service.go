@@ -41,16 +41,16 @@ func (s *QueryService) WipLots(ctx context.Context, page domain.Page) ([]reposit
 	return items, next, nil
 }
 
-// StationQueues 等待时间超过阈值且设备能力可用的站点队列。
+// StationQueues 等待时间达到阈值且设备能力可用的站点队列。
+// minWait 直接透传至仓储，与 s.d.Clock.Now() 共同决定 deadline=now-minWait；
+// 仓储使用非严格比较 entered_at<=deadline，使等待时长恰好等于阈值的批次可见。
+// 不再对 minWait 做 Round 归一化：Round(time.Nanosecond) 是恒等变换，既不收敛
+// 阈值也无法纠正时钟，反而掩盖了“达到阈值即应可见”的边界语义。
 func (s *QueryService) StationQueues(ctx context.Context, minWait time.Duration) ([]repository.StationQueueItem, error) {
 	if minWait < 0 {
 		return nil, domain.NewValidationError(domain.FieldError{Field: "min_wait", Message: "等待阈值不能为负"})
 	}
-	normalizedWait := minWait.Round(time.Nanosecond)
-	if normalizedWait < 0 {
-		return nil, domain.NewValidationError(domain.FieldError{Field: "min_wait", Message: "等待阈值不能为负"})
-	}
-	return s.d.Store.StationQueues(ctx, normalizedWait, s.d.Clock.Now())
+	return s.d.Store.StationQueues(ctx, minWait, s.d.Clock.Now())
 }
 
 // ReworkStats 按设备腔体与配方版本聚合的重复返工批次。

@@ -95,14 +95,16 @@ func (s *Store) WipLots(ctx context.Context, page domain.Page) ([]repository.Wip
 	return out, rows.Err()
 }
 
-// StationQueues 等待时间超过阈值且设备能力可用的站点队列。
+// StationQueues 等待时间达到阈值且设备能力可用的站点队列。
 // 在 QUEUED 状态的批次等待其 current_seq 站点；设备能力可用定义为：
 // 站点下存在 ACTIVE 设备且其至少一个 ACTIVE 腔体能力覆盖站点要求。
+// 等待时长（now - entered_at）达到 minWait 即视为可调度，使用非严格比较
+// entered_at <= now-minWait，使恰好等待满阈值的批次在阈值时刻即可见。
 func (s *Store) StationQueues(ctx context.Context, minWait time.Duration, now time.Time) ([]repository.StationQueueItem, error) {
 	deadline := now.Add(-minWait)
 	rows, err := s.q(ctx).QueryContext(ctx,
 		`SELECT l.id, l.code, l.current_seq, l.entered_at, l.freeze_snapshot
-		 FROM lots l WHERE l.status=? AND l.entered_at IS NOT NULL AND l.entered_at<?
+		 FROM lots l WHERE l.status=? AND l.entered_at IS NOT NULL AND l.entered_at<=?
 		 ORDER BY l.entered_at, l.id`, domain.LotQueued, ms(deadline))
 	if err != nil {
 		return nil, err
