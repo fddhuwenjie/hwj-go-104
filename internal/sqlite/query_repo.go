@@ -166,17 +166,17 @@ func (s *Store) countCapableEquipment(ctx context.Context, stationID, capability
 		return 0, err
 	}
 	defer rows.Close()
-	count := 0
+	seen := map[string]bool{}
 	for rows.Next() {
 		var id, cap string
 		if err := rows.Scan(&id, &cap); err != nil {
 			return 0, err
 		}
 		if capabilityCovers(cap, capability) {
-			count++
+			seen[id] = true
 		}
 	}
-	return count, rows.Err()
+	return len(seen), rows.Err()
 }
 
 // capabilityCovers 与 rules 层一致的标签覆盖判断（查询层本地副本避免 SQL 复杂化）。

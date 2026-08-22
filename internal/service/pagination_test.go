@@ -121,6 +121,27 @@ func TestStationQueuesQuery(t *testing.T) {
 	}
 }
 
+// TestStationQueuesCountsEquipmentOnce 多个合格腔体不能把同一设备重复计数。
+func TestStationQueuesCountsEquipmentOnce(t *testing.T) {
+	e := newTestEnv(t)
+	e.setupAll()
+	if _, err := e.svc.Master.CreateChamber(e.ctx, e.eq1.ID, "CH-B", "etch,backup"); err != nil {
+		t.Fatalf("新增腔体: %v", err)
+	}
+	lot := e.registerLot("LOT-Q-UNIQUE")
+	if _, _, err := e.svc.Lot.Enter(e.ctx, lot.ID, ""); err != nil {
+		t.Fatalf("进站: %v", err)
+	}
+	e.clk.Advance(10 * time.Minute)
+	items, err := e.svc.Query.StationQueues(e.ctx, 5*time.Minute)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("队列查询: %v %+v", err, items)
+	}
+	if items[0].CapableEquipment != 1 {
+		t.Fatalf("同一设备被多个腔体重复计数: %+v", items[0])
+	}
+}
+
 // TestReworkStatsQuery 重复返工聚合：按设备腔体与配方版本分组。
 func TestReworkStatsQuery(t *testing.T) {
 	e := newTestEnv(t)
