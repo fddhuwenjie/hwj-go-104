@@ -22,19 +22,19 @@ type testEnv struct {
 	svc   *service.Services
 	ctx   context.Context
 
-	pf     *domain.ProductFamily
-	st1    *domain.Station
-	st2    *domain.Station
-	rc1    *domain.Recipe
-	rc2    *domain.Recipe
-	plan1  *domain.MetrologyPlan
-	plan2  *domain.MetrologyPlan
-	route  *domain.Route
-	rev    *domain.RouteRevision
-	eq1    *domain.Equipment
-	ch1    *domain.Chamber
-	eq2    *domain.Equipment
-	ch2    *domain.Chamber
+	pf    *domain.ProductFamily
+	st1   *domain.Station
+	st2   *domain.Station
+	rc1   *domain.Recipe
+	rc2   *domain.Recipe
+	plan1 *domain.MetrologyPlan
+	plan2 *domain.MetrologyPlan
+	route *domain.Route
+	rev   *domain.RouteRevision
+	eq1   *domain.Equipment
+	ch1   *domain.Chamber
+	eq2   *domain.Equipment
+	ch2   *domain.Chamber
 }
 
 var baseTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)

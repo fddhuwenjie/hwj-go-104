@@ -7,7 +7,7 @@ type Equipment struct {
 	ID        string          `json:"id"`
 	Code      string          `json:"code"`
 	Name      string          `json:"name"`
-	Family    string          `json:"family"`    // 设备族，配方按族适配
+	Family    string          `json:"family"`     // 设备族，配方按族适配
 	StationID string          `json:"station_id"` // 设备服务的站点
 	Status    EquipmentStatus `json:"status"`
 	Version   int             `json:"version"`

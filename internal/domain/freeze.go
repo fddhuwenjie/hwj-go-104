@@ -5,10 +5,10 @@ import "encoding/json"
 // FreezeSnapshot 批次首次进站时的冻结快照：
 // 路线修订、站点顺序、配方快照与量测计划全部固化，后续运行只能引用快照。
 type FreezeSnapshot struct {
-	RouteID         string              `json:"route_id"`
-	RouteRevisionID string              `json:"route_revision_id"`
-	Revision        int                 `json:"revision"`
-	Stations        []FreezeStation     `json:"stations"`
+	RouteID         string          `json:"route_id"`
+	RouteRevisionID string          `json:"route_revision_id"`
+	Revision        int             `json:"revision"`
+	Stations        []FreezeStation `json:"stations"`
 }
 
 // FreezeStation 冻结快照中的站点条目。

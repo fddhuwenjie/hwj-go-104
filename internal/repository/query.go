@@ -22,25 +22,25 @@ type ExpiredQualificationRun struct {
 
 // WipLot 在制批次视图：携带冻结路线与最近暂扣原因。
 type WipLot struct {
-	LotID          string     `json:"lot_id"`
-	Code           string     `json:"code"`
-	Status         string     `json:"status"`
-	CurrentSeq     int        `json:"current_seq"`
-	FrozenRevision *int       `json:"frozen_revision,omitempty"`
-	FrozenAt       *time.Time `json:"frozen_at,omitempty"`
-	LatestHoldReason string   `json:"latest_hold_reason,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
+	LotID            string     `json:"lot_id"`
+	Code             string     `json:"code"`
+	Status           string     `json:"status"`
+	CurrentSeq       int        `json:"current_seq"`
+	FrozenRevision   *int       `json:"frozen_revision,omitempty"`
+	FrozenAt         *time.Time `json:"frozen_at,omitempty"`
+	LatestHoldReason string     `json:"latest_hold_reason,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
 }
 
 // StationQueueItem 站点队列项：等待超时且存在可用设备。
 type StationQueueItem struct {
-	StationID     string    `json:"station_id"`
-	StationCode   string    `json:"station_code"`
-	LotID         string    `json:"lot_id"`
-	LotCode       string    `json:"lot_code"`
-	QueuedAt      time.Time `json:"queued_at"`
-	WaitSeconds   int64     `json:"wait_seconds"`
-	CapableEquipment int    `json:"capable_equipment"`
+	StationID        string    `json:"station_id"`
+	StationCode      string    `json:"station_code"`
+	LotID            string    `json:"lot_id"`
+	LotCode          string    `json:"lot_code"`
+	QueuedAt         time.Time `json:"queued_at"`
+	WaitSeconds      int64     `json:"wait_seconds"`
+	CapableEquipment int       `json:"capable_equipment"`
 }
 
 // ReworkStat 重复返工聚合：按设备腔体与配方版本分组。
@@ -53,7 +53,7 @@ type ReworkStat struct {
 
 // GenealogyIssue 父子批审计不一致项。
 type GenealogyIssue struct {
-	Issue   string `json:"issue"`   // STATUS_MISMATCH / WAFER_ORPHAN / WAFER_LOST
+	Issue   string `json:"issue"` // STATUS_MISMATCH / WAFER_ORPHAN / WAFER_LOST
 	LotID   string `json:"lot_id"`
 	Related string `json:"related"` // 关联批次或晶圆
 	Detail  string `json:"detail"`

@@ -4,20 +4,20 @@ import "time"
 
 // MetrologyPlan 量测计划：定义抽样位置与最小样本数。
 type MetrologyPlan struct {
-	ID        string     `json:"id"`
-	Code      string     `json:"code"`
-	Name      string     `json:"name"`
-	Version   int        `json:"version"`
-	Status    PlanStatus `json:"status"`
+	ID      string     `json:"id"`
+	Code    string     `json:"code"`
+	Name    string     `json:"name"`
+	Version int        `json:"version"`
+	Status  PlanStatus `json:"status"`
 	// SamplePositions 计划要求抽样的晶圆槽位（1 起始）。
 	SamplePositions []int `json:"sample_positions"`
 	// MinSamples 最小抽样数量。
-	MinSamples  int       `json:"min_samples"`
+	MinSamples int `json:"min_samples"`
 	// PassLimit 判定阈值：读数不超过该值判 PASS。
-	PassLimit   float64   `json:"pass_limit"`
-	Metric      string    `json:"metric"`
-	RowVersion  int       `json:"row_version"`
-	CreatedAt   time.Time `json:"created_at"`
+	PassLimit  float64   `json:"pass_limit"`
+	Metric     string    `json:"metric"`
+	RowVersion int       `json:"row_version"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // Validate 校验量测计划字段。

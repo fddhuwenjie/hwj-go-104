@@ -17,8 +17,8 @@ type RecipeVersion struct {
 	RecipeID    string       `json:"recipe_id"`
 	Version     int          `json:"version"`
 	Status      RecipeStatus `json:"status"`
-	ParamsJSON  string       `json:"params_json"`  // 草稿参数，启用后冻结
-	Snapshot    string       `json:"snapshot"`     // 不可变快照（启用时生成）
+	ParamsJSON  string       `json:"params_json"` // 草稿参数，启用后冻结
+	Snapshot    string       `json:"snapshot"`    // 不可变快照（启用时生成）
 	ActivatedAt *time.Time   `json:"activated_at,omitempty"`
 	RowVersion  int          `json:"row_version"` // 乐观锁
 	CreatedAt   time.Time    `json:"created_at"`

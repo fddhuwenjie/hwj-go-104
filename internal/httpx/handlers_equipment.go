@@ -153,12 +153,12 @@ func (h *handlers) listQualifications(w http.ResponseWriter, r *http.Request) {
 // createPlan 建档量测计划。
 func (h *handlers) createPlan(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Code            string   `json:"code"`
-		Name            string   `json:"name"`
-		Metric          string   `json:"metric"`
-		SamplePositions []int    `json:"sample_positions"`
-		MinSamples      int      `json:"min_samples"`
-		PassLimit       float64  `json:"pass_limit"`
+		Code            string  `json:"code"`
+		Name            string  `json:"name"`
+		Metric          string  `json:"metric"`
+		SamplePositions []int   `json:"sample_positions"`
+		MinSamples      int     `json:"min_samples"`
+		PassLimit       float64 `json:"pass_limit"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, err)

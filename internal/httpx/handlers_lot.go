@@ -9,11 +9,11 @@ import (
 // registerLot 批次登记（幂等键：Idempotency-Key 请求头或 idempotency_key 字段）。
 func (h *handlers) registerLot(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Code            string                `json:"code"`
-		ProductFamilyID string                `json:"product_family_id"`
-		RouteID         string                `json:"route_id"`
-		Wafers          []service.WaferInput  `json:"wafers"`
-		IdempotencyKey  string                `json:"idempotency_key"`
+		Code            string               `json:"code"`
+		ProductFamilyID string               `json:"product_family_id"`
+		RouteID         string               `json:"route_id"`
+		Wafers          []service.WaferInput `json:"wafers"`
+		IdempotencyKey  string               `json:"idempotency_key"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, err)

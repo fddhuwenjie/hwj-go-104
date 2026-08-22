@@ -13,10 +13,10 @@ type Route struct {
 
 // RouteRevision 工艺路线修订：版本化，启用后不可修改。
 type RouteRevision struct {
-	ID             string         `json:"id"`
-	RouteID        string         `json:"route_id"`
-	Revision       int            `json:"revision"`
-	Status         RevisionStatus `json:"status"`
+	ID       string         `json:"id"`
+	RouteID  string         `json:"route_id"`
+	Revision int            `json:"revision"`
+	Status   RevisionStatus `json:"status"`
 	// ReworkFromHoldID 非空表示该修订由返工复判创建。
 	ReworkFromHoldID string `json:"rework_from_hold_id,omitempty"`
 	// ReentrySeq 返工重入站点顺序号（仅返工修订使用）。

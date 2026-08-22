@@ -14,7 +14,7 @@ func TestSplitLotGenealogy(t *testing.T) {
 	e.setupAll()
 
 	parent := e.registerLot("LOT-P")
-	e.enterAndRun(parent.ID)              // 冻结并进入 RUNNING
+	e.enterAndRun(parent.ID)                       // 冻结并进入 RUNNING
 	parent, _ = e.svc.Lot.GetLot(e.ctx, parent.ID) // 重新读取冻结后的父批
 
 	wafers, _ := e.svc.Lot.ListWafers(e.ctx, parent.ID)

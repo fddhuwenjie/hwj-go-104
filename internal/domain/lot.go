@@ -19,10 +19,10 @@ type Lot struct {
 	// ParentLotID 父批次；拆分产生的子批记录父批形成谱系。
 	ParentLotID string `json:"parent_lot_id,omitempty"`
 	// EnteredAt 当前站点进站排队时间。
-	EnteredAt   *time.Time `json:"entered_at,omitempty"`
-	Version     int    `json:"version"` // 乐观锁
-	CreatedAt   time.Time `json:"created_at"`
-	ClosedAt    *time.Time `json:"closed_at,omitempty"`
+	EnteredAt *time.Time `json:"entered_at,omitempty"`
+	Version   int        `json:"version"` // 乐观锁
+	CreatedAt time.Time  `json:"created_at"`
+	ClosedAt  *time.Time `json:"closed_at,omitempty"`
 }
 
 // IsFrozen 判断批次是否已冻结路线。
