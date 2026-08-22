@@ -7,6 +7,20 @@ import (
 	"gowork/wafer/internal/service"
 )
 
+// TestRegisterLotRejectsRouteFromAnotherFamily 保证批次产品族和工艺路线归属一致。
+func TestRegisterLotRejectsRouteFromAnotherFamily(t *testing.T) {
+	e := newTestEnv(t)
+	e.setupAll()
+	other, err := e.svc.Master.CreateProductFamily(e.ctx, "PF-OTHER", "其他产品族")
+	if err != nil {
+		t.Fatalf("其他产品族: %v", err)
+	}
+	_, _, err = e.svc.Lot.RegisterLot(e.ctx, "LOT-CROSS-FAMILY", other.ID, e.route.ID, []service.WaferInput{{Code: "W-CROSS", Slot: 1}}, "")
+	if err == nil {
+		t.Fatal("不属于批次产品族的路线不应被接受")
+	}
+}
+
 // TestFullHappyChain 完整正常业务链：
 // 主数据建档 -> 版本启用 -> 批次登记 -> 进站冻结 -> 开工 -> 完工 ->
 // 量测采集 -> 封存判定 -> 下一站放行 -> 第二站重复 -> 末站放行 -> 批次关闭。

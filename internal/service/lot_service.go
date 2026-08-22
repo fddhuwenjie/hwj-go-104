@@ -36,8 +36,12 @@ func (s *LotService) RegisterLot(ctx context.Context, code, productFamilyID, rou
 		if _, err := s.d.Store.GetProductFamily(tx, productFamilyID); err != nil {
 			return nil, err
 		}
-		if _, err := s.d.Store.GetRoute(tx, routeID); err != nil {
+		route, err := s.d.Store.GetRoute(tx, routeID)
+		if err != nil {
 			return nil, err
+		}
+		if route.ProductFamilyID != productFamilyID {
+			return nil, domain.NewValidationError(domain.FieldError{Field: "route_id", Message: "工艺路线必须属于批次产品族"})
 		}
 		var ws []domain.Wafer
 		for _, in := range wafers {
