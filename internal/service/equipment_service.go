@@ -104,15 +104,23 @@ func (s *MasterService) CreateQualification(ctx context.Context, equipmentID, ch
 	if err := q.Validate(); err != nil {
 		return nil, err
 	}
-	if _, err := s.d.Store.GetEquipment(ctx, equipmentID); err != nil {
+	equipment, err := s.d.Store.GetEquipment(ctx, equipmentID)
+	if err != nil {
 		return nil, err
+	}
+	if equipment.StationID != stationID {
+		return nil, domain.NewValidationError(domain.FieldError{Field: "station_id", Message: "资质站点必须与设备所属站点一致"})
 	}
 	if _, err := s.d.Store.GetStation(ctx, stationID); err != nil {
 		return nil, err
 	}
 	if chamberID != "" {
-		if _, err := s.d.Store.GetChamber(ctx, chamberID); err != nil {
+		chamber, err := s.d.Store.GetChamber(ctx, chamberID)
+		if err != nil {
 			return nil, err
+		}
+		if chamber.EquipmentID != equipmentID {
+			return nil, domain.NewValidationError(domain.FieldError{Field: "chamber_id", Message: "资质腔体必须属于指定设备"})
 		}
 	}
 	if err := s.d.Store.CreateQualification(ctx, q); err != nil {

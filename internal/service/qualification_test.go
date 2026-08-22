@@ -91,6 +91,24 @@ func TestStartBeforeQualification(t *testing.T) {
 	}
 }
 
+// TestQualificationRejectsCrossEntityReferences 保证资质不能把设备、站点和腔体跨实体拼接。
+func TestQualificationRejectsCrossEntityReferences(t *testing.T) {
+	e := newTestEnv(t)
+	e.setupMaster()
+	e.setupEquipment(false)
+	from, to := baseTime.Add(-time.Hour), baseTime.Add(time.Hour)
+
+	if _, err := e.svc.Master.CreateQualification(e.ctx, e.eq1.ID, e.ch2.ID, e.st1.ID, from, to); err == nil {
+		t.Fatal("其他设备的腔体不应挂到当前设备资质")
+	}
+	if _, err := e.svc.Master.CreateQualification(e.ctx, e.eq1.ID, "", e.st2.ID, from, to); err == nil {
+		t.Fatal("设备资质不应挂到其他站点")
+	}
+	if _, err := e.svc.Master.CreateQualification(e.ctx, e.eq1.ID, e.ch1.ID, e.st1.ID, from, to); err != nil {
+		t.Fatalf("一致的设备、腔体和站点应允许建档: %v", err)
+	}
+}
+
 // TestRecipeFamilyMismatch 配方只能在适配设备族上执行。
 func TestRecipeFamilyMismatch(t *testing.T) {
 	e := newTestEnv(t)
