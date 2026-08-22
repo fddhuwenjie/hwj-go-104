@@ -50,8 +50,16 @@ func idempotent[T any](
 ) (T, bool, error) {
 	var zero T
 	if key == "" {
-		out, err := fn(ctx)
-		return out, false, err
+		var out T
+		err := d.Store.InTx(ctx, func(tx context.Context) error {
+			var innerErr error
+			out, innerErr = fn(tx)
+			return innerErr
+		})
+		if err != nil {
+			return zero, false, err
+		}
+		return out, false, nil
 	}
 	raw, err := d.Store.GetIdempotency(ctx, scope, key)
 	if err == nil {

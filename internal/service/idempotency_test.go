@@ -9,6 +9,22 @@ import (
 	"gowork/wafer/internal/service"
 )
 
+// TestEmptyIdempotencyKeyStillUsesTransaction 验证不传幂等键时业务写入仍保持原子性。
+func TestEmptyIdempotencyKeyStillUsesTransaction(t *testing.T) {
+	e := newTestEnv(t)
+	e.setupAll()
+	_, _, err := e.svc.Lot.RegisterLot(e.ctx, "ATOMIC-NO-KEY", e.pf.ID, e.route.ID, []service.WaferInput{
+		{Code: "DUPLICATE-WAFER", Slot: 1},
+		{Code: "DUPLICATE-WAFER", Slot: 2},
+	}, "")
+	if err == nil {
+		t.Fatal("重复晶圆编码应导致登记失败")
+	}
+	if _, err := e.store.FindLotByCode(e.ctx, "ATOMIC-NO-KEY"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("失败登记不应残留批次: %v", err)
+	}
+}
+
 // TestIdempotentReplay 幂等重放：相同幂等键的重复请求返回同一结果，
 // 不产生重复副作用（批次、晶圆、运行数量不翻倍）。
 func TestIdempotentReplay(t *testing.T) {
