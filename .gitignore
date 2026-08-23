@@ -1,0 +1,11 @@
+# 构建产物
+bin/
+/server
+
+# 本地数据库文件
+*.db
+*.db-shm
+*.db-wal
+
+# 系统文件
+.DS_Store
