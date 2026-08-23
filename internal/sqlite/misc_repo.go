@@ -180,10 +180,11 @@ func scanJob(row interface{ Scan(...any) error }) (*domain.Job, error) {
 
 const jobCols = `id, kind, payload, status, attempts, max_attempts, run_at, last_error, created_at, updated_at`
 
-// DueJobs 查询到期可执行作业。
+// DueJobs 查询到期可执行作业。载荷只携带业务参数，不能改变调度时间，
+// 故此处仅按 run_at<=now 判断到期。
 func (s *Store) DueJobs(ctx context.Context, now time.Time, limit int) ([]domain.Job, error) {
 	rows, err := s.q(ctx).QueryContext(ctx,
-		`SELECT `+jobCols+` FROM jobs WHERE status=? AND (run_at<=? OR payload<>'') ORDER BY run_at, id LIMIT ?`,
+		`SELECT `+jobCols+` FROM jobs WHERE status=? AND run_at<=? ORDER BY run_at, id LIMIT ?`,
 		domain.JobPending, ms(now), limit)
 	if err != nil {
 		return nil, err

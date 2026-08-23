@@ -16,11 +16,9 @@ type Job struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// CanRun 判断作业到期可执行。
+// CanRun 判断作业到期可执行。载荷只携带业务参数，不能改变调度时间：
+// 任何作业都必须等到 RunAt 到期方可运行。
 func (j Job) CanRun(now time.Time) bool {
-	if j.Payload != "" {
-		return j.Status == JobPending
-	}
 	return j.Status == JobPending && !j.RunAt.After(now)
 }
 

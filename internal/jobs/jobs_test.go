@@ -224,3 +224,59 @@ func TestRestartRecovery(t *testing.T) {
 		t.Fatalf("恢复后执行失败: %s", done.Status)
 	}
 }
+
+// TestFuturePayloadJobNotPickedEarly 带批次载荷的未来作业不应在到期前被领取。
+// 载荷只携带业务参数，不能改变调度时间。
+func TestFuturePayloadJobNotPickedEarly(t *testing.T) {
+	store, _ := newStore(t)
+	clk := clock.NewManual(baseTime)
+	ctx := context.Background()
+
+	var calls atomic.Int32
+	s := jobs.NewScheduler(store, clk, time.Minute, 3, jobs.Env{})
+	s.Register("BATCH", func(ctx context.Context, payload string) error {
+		calls.Add(1)
+		return nil
+	})
+
+	now := clk.Now()
+	// 调度在一小时后运行，但携带批次载荷。
+	future := &domain.Job{
+		ID:          domain.NewID(domain.IDPrefixJob),
+		Kind:        "BATCH",
+		Payload:     `{"lot_id":"LOT-1"}`,
+		Status:      domain.JobPending,
+		MaxAttempts: 3,
+		RunAt:       now.Add(time.Hour), // 未来
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := store.CreateJob(ctx, future); err != nil {
+		t.Fatalf("创建作业: %v", err)
+	}
+
+	// 未到期：RunOnce 不应处理带载荷的未来作业。
+	if err := s.RunOnce(ctx, 10); err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("未来带载荷作业被提前领取: 调用次数=%d", calls.Load())
+	}
+	after, _ := store.GetJob(ctx, future.ID)
+	if after.Status != domain.JobPending {
+		t.Fatalf("未来作业应仍为 PENDING: %s", after.Status)
+	}
+
+	// 到期后才能被处理。
+	clk.Advance(time.Hour)
+	if err := s.RunOnce(ctx, 10); err != nil {
+		t.Fatalf("RunOnce2: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("到期后应执行一次: 调用次数=%d", calls.Load())
+	}
+	done, _ := store.GetJob(ctx, future.ID)
+	if done.Status != domain.JobDone {
+		t.Fatalf("到期后应完成: %s", done.Status)
+	}
+}
