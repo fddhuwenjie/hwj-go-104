@@ -47,6 +47,10 @@ func (s *Store) ExpiredQualificationRuns(ctx context.Context, page domain.Page) 
 }
 
 // WipLots 当前在制批次（含冻结修订号与最近暂扣原因），稳定分页。
+// 关联必须基于批次自身冻结的路线修订（l.frozen_revision_id），而非路线当前启用修订：
+// 否则启用新版本后旧批的冻结修订号会被改写，并列查询在制记录时出现跨版本污染
+// （旧批冻结于 v1、启用 v2 后两条记录都显示 v2）。未冻结批次的 frozen_revision_id
+// 为空，LEFT JOIN 自然得 NULL，FrozenRevision 留空。
 func (s *Store) WipLots(ctx context.Context, page domain.Page) ([]repository.WipLot, error) {
 	page = page.Normalize()
 	key, err := domain.DecodeCursor(page.Cursor)
@@ -57,7 +61,7 @@ func (s *Store) WipLots(ctx context.Context, page domain.Page) ([]repository.Wip
 	    (SELECT h.reason FROM holds h WHERE h.lot_id=l.id ORDER BY h.created_at DESC, h.id DESC LIMIT 1),
 	    l.created_at
 	  FROM lots l
-	  LEFT JOIN route_revisions rr ON rr.route_id = l.route_id AND rr.status='ACTIVE'
+	  LEFT JOIN route_revisions rr ON rr.id = l.frozen_revision_id
 	  WHERE l.status IN (?,?,?,?,?)`
 	args := []any{domain.LotRegistered, domain.LotQueued, domain.LotRunning, domain.LotWaiting, domain.LotOnHold}
 	if page.Cursor != "" {

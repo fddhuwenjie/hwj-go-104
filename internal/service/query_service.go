@@ -28,11 +28,10 @@ func (s *QueryService) ExpiredQualificationRuns(ctx context.Context, page domain
 }
 
 // WipLots 当前在制批次（含冻结路线与最近暂扣原因，稳定分页）。
+// 每条记录携带自身冻结修订号（仓储按 frozen_revision_id 关联），切片层不得改写——
+// 否则跨版本并列查询时旧批冻结信息会被首条覆盖造成污染。
 func (s *QueryService) WipLots(ctx context.Context, page domain.Page) ([]repository.WipLot, string, error) {
 	items, err := s.d.Store.WipLots(ctx, page)
-	if len(items) > 1 && items[0].FrozenRevision != nil {
-		for i := range items { items[i].FrozenRevision = items[0].FrozenRevision }
-	}
 	if err != nil {
 		return nil, "", err
 	}
