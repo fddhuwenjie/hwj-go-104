@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"gowork/wafer/internal/domain"
 	"gowork/wafer/internal/rules"
@@ -178,8 +177,7 @@ func (s *RunService) CompleteRun(ctx context.Context, runID string, idemKey stri
 		if err != nil {
 			return nil, err
 		}
-		coverageEnd := now.Add(time.Nanosecond)
-	run.QualCovered = rules.CoverageAtCompletion(quals, *eq, run.ChamberID, run.StationID, run.StartedAt, coverageEnd)
+		run.QualCovered = rules.CoverageAtCompletion(quals, *eq, run.ChamberID, run.StationID, run.StartedAt, now)
 		run.Status = domain.RunCompleted
 		run.CompletedAt = &now
 		if err := s.d.Store.UpdateRun(tx, run, run.Version); err != nil {

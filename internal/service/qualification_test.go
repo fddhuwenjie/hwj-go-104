@@ -56,6 +56,76 @@ func TestQualificationTimeBoundary(t *testing.T) {
 	}
 }
 
+// TestCompletionAtQualificationExpiry 完工时刻恰等于资质截止时刻（valid_to）时，
+// 完整覆盖区间的截止时刻应包含该次完工：qual_covered 必须为 true，运行不得进入过期复判清单。
+// 这是与 TestQualificationTimeBoundary（完工晚于 valid_to → 未覆盖）互补的边界：
+// 恰在 valid_to 完工应被覆盖，提前完工同样覆盖，只有超过 valid_to 才标记未覆盖。
+func TestCompletionAtQualificationExpiry(t *testing.T) {
+	e := newTestEnv(t)
+	e.setupMaster()
+	e.activateVersions()
+	e.setupEquipment(false) // 不建长窗口资质，避免干扰边界断言
+
+	// 覆盖 [base+1h, base+2h] 的短窗口资质。
+	shortFrom := baseTime.Add(time.Hour)
+	shortTo := baseTime.Add(2 * time.Hour)
+	if _, err := e.svc.Master.CreateQualification(e.ctx, e.eq1.ID, e.ch1.ID, e.st1.ID, shortFrom, shortTo); err != nil {
+		t.Fatalf("短窗口资质: %v", err)
+	}
+
+	lot := e.registerLot("LOT-EXPIRY")
+	if _, _, err := e.svc.Lot.Enter(e.ctx, lot.ID, ""); err != nil {
+		t.Fatalf("进站: %v", err)
+	}
+
+	// 开工时刻 == valid_from（允许）。
+	e.clk.Set(shortFrom)
+	if _, _, err := e.svc.Run.CreateRun(e.ctx, lot.ID, e.eq1.ID, e.ch1.ID, nil, ""); err != nil {
+		t.Fatalf("valid_from 边界开工应允许: %v", err)
+	}
+	run, _ := e.svc.Run.ListRunsByLot(e.ctx, lot.ID)
+
+	// 边界：完工时刻 == valid_to。完整覆盖区间截止时刻应包含该次完工。
+	e.clk.Set(shortTo)
+	completed, _, err := e.svc.Run.CompleteRun(e.ctx, run[0].ID, "")
+	if err != nil {
+		t.Fatalf("完工: %v", err)
+	}
+	if !completed.QualCovered {
+		t.Fatal("完工时刻 == valid_to 应被资质窗口覆盖，qual_covered 必须为 true")
+	}
+
+	// 已覆盖的运行不得进入过期资质复判清单。
+	items, _, err := e.svc.Query.ExpiredQualificationRuns(e.ctx, domain.Page{Limit: 10})
+	if err != nil {
+		t.Fatalf("过期资质查询: %v", err)
+	}
+	for _, it := range items {
+		if it.RunID == completed.ID {
+			t.Fatalf("完工恰在 valid_to 应已覆盖，不得进入过期复判清单: %+v", it)
+		}
+	}
+
+	// 对照：提前一毫秒完工同样覆盖（证明修复未引入对“提前完工”的回归）。
+	lot2 := e.registerLot("LOT-EXPIRY-EARLY")
+	if _, _, err := e.svc.Lot.Enter(e.ctx, lot2.ID, ""); err != nil {
+		t.Fatalf("进站2: %v", err)
+	}
+	e.clk.Set(shortFrom)
+	if _, _, err := e.svc.Run.CreateRun(e.ctx, lot2.ID, e.eq1.ID, e.ch1.ID, nil, ""); err != nil {
+		t.Fatalf("开工2: %v", err)
+	}
+	run2, _ := e.svc.Run.ListRunsByLot(e.ctx, lot2.ID)
+	e.clk.Set(shortTo.Add(-time.Millisecond))
+	completed2, _, err := e.svc.Run.CompleteRun(e.ctx, run2[0].ID, "")
+	if err != nil {
+		t.Fatalf("完工2: %v", err)
+	}
+	if !completed2.QualCovered {
+		t.Fatal("完工时刻早于 valid_to 应被覆盖，qual_covered 必须为 true")
+	}
+}
+
 // TestStartBeforeQualification 开工时刻早于资质生效时间必须被拒绝。
 func TestStartBeforeQualification(t *testing.T) {
 	e := newTestEnv(t)

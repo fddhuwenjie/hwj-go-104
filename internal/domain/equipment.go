@@ -36,12 +36,13 @@ type Qualification struct {
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
-// Covers 判断资质窗口是否完整覆盖 [start, end]。
+// Covers 判断资质窗口是否完整覆盖 [start, end]（闭区间）。
+// 起止时刻均含端点：start == valid_from 与 end == valid_to 均视为覆盖。
 func (q Qualification) Covers(start, end time.Time) bool {
 	if q.Status != QualActive {
 		return false
 	}
-	return !q.ValidFrom.After(start) && q.ValidTo.After(end)
+	return !q.ValidFrom.After(start) && !q.ValidTo.Before(end)
 }
 
 // Validate 校验设备字段。
