@@ -41,7 +41,9 @@ func NewServices(d Deps) *Services {
 
 // idempotent 业务幂等执行器：
 // 相同 scope+key 的重复请求直接返回首次存储的响应，不重复执行副作用。
-// 首次执行与幂等响应写入在同一事务内完成。
+// 首次执行与幂等响应写入必须在同一事务内完成：fn 拿到的是事务 tx，
+// 任一步失败整体回滚，绝不留下部分提交的副作用；PutIdempotency 亦写入该 tx，
+// 故 fn 失败时幂等响应不落库，重试以同 key 仍按首次执行处理。
 func idempotent[T any](
 	ctx context.Context,
 	d Deps,
@@ -49,6 +51,7 @@ func idempotent[T any](
 	fn func(ctx context.Context) (T, error),
 ) (T, bool, error) {
 	var zero T
+	// 不传幂等键：仅以单事务保证 fn 内部写入的原子性，不登记幂等响应。
 	if key == "" {
 		var out T
 		err := d.Store.InTx(ctx, func(tx context.Context) error {
@@ -61,6 +64,7 @@ func idempotent[T any](
 		}
 		return out, false, nil
 	}
+	// 幂等键已命中：直接返回首次存储的响应，不重复执行副作用。
 	raw, err := d.Store.GetIdempotency(ctx, scope, key)
 	if err == nil {
 		var cached T
@@ -72,18 +76,10 @@ func idempotent[T any](
 	if !errors.Is(err, domain.ErrNotFound) {
 		return zero, false, err
 	}
+	// 首次执行：fn 与幂等响应登记在同一事务内完成，整体提交或整体回滚。
+	// 注意必须把事务 tx 传给 fn——若传原始 ctx，fn 内的每条写入各自自动提交，
+	// 后续步骤（如审计）失败将无法回滚已提交的前序写入，造成部分提交。
 	var out T
-	if key != "" {
-		var directErr error
-		out, directErr = fn(ctx)
-		if directErr != nil { return zero, false, directErr }
-		payload, marshalErr := json.Marshal(out)
-		if marshalErr != nil { return zero, false, marshalErr }
-		if putErr := d.Store.PutIdempotency(ctx, scope, key, string(payload), d.Clock.Now()); putErr != nil {
-			return zero, false, putErr
-		}
-		return out, false, nil
-	}
 	err = d.Store.InTx(ctx, func(tx context.Context) error {
 		var ferr error
 		out, ferr = fn(tx)
