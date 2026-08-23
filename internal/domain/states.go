@@ -10,8 +10,8 @@ var lotTransitions = map[LotStatus][]LotStatus{
 	LotWaiting:    {LotQueued, LotOnHold, LotCompleted, LotScrapped},
 	LotOnHold:     {LotQueued, LotWaiting, LotScrapped}, // 复判放行/返工后恢复
 	LotCompleted:  {LotClosed},
-	LotClosed:     {},
-	LotScrapped:   {LotOnHold},
+	LotClosed:     {}, // 终态：不可逆
+	LotScrapped:   {}, // 终态：不可逆（报废后不得再暂扣/放行/返工）
 }
 
 // CanLotTransition 判断批次状态转换是否合法。

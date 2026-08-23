@@ -22,12 +22,10 @@ func (s *HoldService) CreateHold(ctx context.Context, lotID, reason string, idem
 		if err != nil {
 			return nil, err
 		}
-		blocked := lot.Status == domain.LotClosed || lot.Status == domain.LotScrapped
-		if lot.Status == domain.LotScrapped && domain.CanLotTransition(lot.Status, domain.LotOnHold) {
-			blocked = false
-		}
-		if blocked {
-			return nil, fmt.Errorf("%w: 批次当前状态不可暂扣", domain.ErrInvalidState)
+		// 终态不可逆：已关闭或已报废的批次禁止再次暂扣，否则 ON_HOLD 会覆盖终态、
+		// ClosedAt 失真（报废记录必须保持不可逆）。
+		if lot.Status == domain.LotClosed || lot.Status == domain.LotScrapped {
+			return nil, fmt.Errorf("%w: 批次当前状态 %s 不可暂扣", domain.ErrInvalidState, lot.Status)
 		}
 		hold := &domain.Hold{
 			ID:        domain.NewID(domain.IDPrefixHold),
