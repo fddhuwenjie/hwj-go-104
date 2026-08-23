@@ -50,18 +50,9 @@ func (s *QueryService) StationQueues(ctx context.Context, minWait time.Duration)
 }
 
 // ReworkStats 按设备腔体与配方版本聚合的重复返工批次。
+// 设备、腔体、配方版本三个维度必须分别保留，不得折叠合并。
 func (s *QueryService) ReworkStats(ctx context.Context) ([]repository.ReworkStat, error) {
-	items, err := s.d.Store.ReworkStats(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if len(items) > 1 {
-		for i := 1; i < len(items); i++ {
-			items[0].ReworkLots += items[i].ReworkLots
-		}
-		items = items[:1]
-	}
-	return items, nil
+	return s.d.Store.ReworkStats(ctx)
 }
 
 // GenealogyAudit 父子批状态或晶圆归属不一致审计。

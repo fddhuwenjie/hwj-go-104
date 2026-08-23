@@ -170,6 +170,89 @@ func TestReworkStatsQuery(t *testing.T) {
 	}
 }
 
+// enterAndRunChamber 进站并开工到指定设备腔体（用于多腔体场景）。
+func (e *testEnv) enterAndRunChamber(lotID, equipmentID, chamberID string) *domain.Run {
+	t := e.t
+	if _, _, err := e.svc.Lot.Enter(e.ctx, lotID, ""); err != nil {
+		t.Fatalf("进站: %v", err)
+	}
+	run, _, err := e.svc.Run.CreateRun(e.ctx, lotID, equipmentID, chamberID, nil, "")
+	if err != nil {
+		t.Fatalf("开工: %v", err)
+	}
+	return run
+}
+
+// failAndHoldChamber 让第一站量测 FAIL 并自动生成暂扣，运行到指定设备腔体上。
+func failAndHoldChamber(t *testing.T, e *testEnv, lotID, equipmentID, chamberID string) *domain.Hold {
+	t.Helper()
+	run := e.enterAndRunChamber(lotID, equipmentID, chamberID)
+	sealed := e.completeAndSeal(run.ID, 999.0) // 超过阈值 10
+	if sealed.Judgment != domain.JudgeFail {
+		t.Fatalf("判定应为 FAIL: %s", sealed.Judgment)
+	}
+	lot, _ := e.svc.Lot.GetLot(e.ctx, lotID)
+	if lot.Status != domain.LotOnHold {
+		t.Fatalf("判定失败批次应为 ON_HOLD: %s", lot.Status)
+	}
+	hold, err := e.store.LatestHold(e.ctx, lotID)
+	if err != nil {
+		t.Fatalf("暂扣不存在: %v", err)
+	}
+	return hold
+}
+
+// TestReworkStatsMultiCombination 同一设备的两个腔体分别产生重复返工时，
+// 设备、腔体、配方版本三个维度必须分别保留：
+// 同设备两腔体各经历一次返工 -> 两个 REWORKED 暂扣落在不同腔体 ->
+// 重复返工聚合必须返回两行，每行 rework_lots=1，腔体不同。
+func TestReworkStatsMultiCombination(t *testing.T) {
+	e := newTestEnv(t)
+	e.setupAll()
+
+	// 同设备 eq1 下新增第二个腔体 CH-B（能力同 CH-A，覆盖站点 etch）。
+	chB, err := e.svc.Master.CreateChamber(e.ctx, e.eq1.ID, "CH-B", "etch")
+	if err != nil {
+		t.Fatalf("新增腔体: %v", err)
+	}
+
+	lot := e.registerLot("LOT-RS-MC")
+	// 两轮返工：第一轮落在腔体 A，第二轮落在腔体 B。
+	// 每轮 FAIL -> 复判返工（换版重入第一站）。两轮后该批次即“重复返工”批次。
+	chambers := []string{e.ch1.ID, chB.ID}
+	for i, chID := range chambers {
+		hold := failAndHoldChamber(t, e, lot.ID, e.eq1.ID, chID)
+		if _, _, err := e.svc.Hold.Review(e.ctx, hold.ID, domain.ReviewRework, "返工", 1, ""); err != nil {
+			t.Fatalf("返工 %d: %v", i, err)
+		}
+	}
+
+	stats, err := e.svc.Query.ReworkStats(e.ctx)
+	if err != nil {
+		t.Fatalf("返工聚合: %v", err)
+	}
+	if len(stats) != 2 {
+		t.Fatalf("同设备两腔体必须各自保留聚合行，得到 %d 行: %+v", len(stats), stats)
+	}
+	// 两行同设备，腔体不同，配方版本相同（返工沿用启用版本），各 rework_lots=1。
+	seenChambers := map[string]int{}
+	for _, s := range stats {
+		if s.EquipmentID != e.eq1.ID {
+			t.Fatalf("设备维度错误: %+v", s)
+		}
+		if s.RecipeVersionID == "" {
+			t.Fatalf("配方版本维度缺失: %+v", s)
+		}
+		if s.ReworkLots != 1 {
+			t.Fatalf("每个腔体的重复返工批次应为 1，得到 %d: %+v", s.ReworkLots, s)
+		}
+		seenChambers[s.ChamberID]++
+	}
+	if seenChambers[e.ch1.ID] != 1 || seenChambers[chB.ID] != 1 {
+		t.Fatalf("腔体维度被折叠，期望两个腔体各一行，实际: %+v", stats)
+	}
+}
+
 // TestGenealogyAuditQuery 谱系审计：父批报废但子批在制 -> STATUS_MISMATCH。
 func TestGenealogyAuditQuery(t *testing.T) {
 	e := newTestEnv(t)

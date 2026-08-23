@@ -229,8 +229,8 @@ func (s *Store) ReworkStats(ctx context.Context) ([]repository.ReworkStat, error
 		 FROM holds h
 		 JOIN runs r ON r.id = h.run_id
 		 WHERE h.status=? AND h.lot_id IN (SELECT lot_id FROM repeat_lots)
-		 GROUP BY r.equipment_id
-		 ORDER BY r.equipment_id`, domain.HoldReworked)
+		 GROUP BY r.equipment_id, r.chamber_id, r.recipe_version_id
+		 ORDER BY r.equipment_id, r.chamber_id, r.recipe_version_id`, domain.HoldReworked)
 	if err != nil {
 		return nil, err
 	}
