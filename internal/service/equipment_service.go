@@ -163,6 +163,9 @@ func (s *MasterService) CreatePlan(ctx context.Context, code, name, metric strin
 }
 
 // ActivatePlan 启用量测计划：同编码其它启用版本退役，乐观锁保护。
+// 退役旧计划、启用新计划、写入审计必须在同一事务内整体提交：
+// 任一步骤失败则整体回滚，避免"旧计划已退役、新计划仍是草稿"的部分切换，
+// 否则生产线将找不到有效计划。
 func (s *MasterService) ActivatePlan(ctx context.Context, id string, expectedVersion int) (*domain.MetrologyPlan, error) {
 	p, err := s.d.Store.GetPlan(ctx, id)
 	if err != nil {
@@ -178,14 +181,19 @@ func (s *MasterService) ActivatePlan(ctx context.Context, id string, expectedVer
 	if err != nil {
 		return nil, err
 	}
+	// 收集同编码的当前启用计划，待事务内整体退役。
+	var toRetire []domain.MetrologyPlan
 	for _, other := range plans {
 		if other.Code == p.Code && other.ID != p.ID && other.Status == domain.PlanActive {
-			if err := s.d.Store.UpdatePlanStatus(ctx, other.ID, domain.PlanRetired, other.RowVersion); err != nil {
-				return nil, err
-			}
+			toRetire = append(toRetire, other)
 		}
 	}
 	err = s.d.Store.InTx(ctx, func(tx context.Context) error {
+		for _, other := range toRetire {
+			if err := s.d.Store.UpdatePlanStatus(tx, other.ID, domain.PlanRetired, other.RowVersion); err != nil {
+				return err
+			}
+		}
 		if err := s.d.Store.UpdatePlanStatus(tx, p.ID, domain.PlanActive, expectedVersion); err != nil {
 			return err
 		}

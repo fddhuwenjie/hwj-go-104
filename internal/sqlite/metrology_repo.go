@@ -81,12 +81,12 @@ func (s *Store) NextPlanVersion(ctx context.Context, code string) (int, error) {
 }
 
 // UpdatePlanStatus 乐观锁更新计划状态。
+// 必须复用调用方事务（s.q(ctx)）：退役旧计划、启用新计划、写入审计
+// 三者须在 InTx 的同一事务内整体提交；若退役写入改用 context.Background()
+// 会逃逸到 s.db 立即提交，审计失败时旧计划已被退役而新计划仍是草稿，
+// 生产线将找不到有效计划。
 func (s *Store) UpdatePlanStatus(ctx context.Context, id string, to domain.PlanStatus, expectedVersion int) error {
-	writeCtx := ctx
-	if to == domain.PlanRetired {
-		writeCtx = context.Background()
-	}
-	res, err := s.q(writeCtx).ExecContext(writeCtx,
+	res, err := s.q(ctx).ExecContext(ctx,
 		`UPDATE metrology_plans SET status=?, row_version=row_version+1 WHERE id=? AND row_version=?`,
 		to, id, expectedVersion)
 	if err != nil {
