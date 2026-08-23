@@ -120,14 +120,14 @@ func TestOptimisticLockConflict(t *testing.T) {
 		t.Fatalf("陈旧版本必须冲突: %v", err)
 	}
 
-	// 修订启用并发冲突。
+	// 修订启用并发冲突：相差一个版本的旧令牌必须冲突。
 	rev, err := e.svc.Master.CreateRevision(e.ctx, e.route.ID, []domain.RouteStation{
 		{Seq: 1, StationID: e.st1.ID, RecipeID: e.rc1.ID, MetrologyPlanID: e.plan1.ID},
 	})
 	if err != nil {
 		t.Fatalf("修订: %v", err)
 	}
-	if _, err := e.svc.Master.ActivateRevision(e.ctx, rev.ID, rev.Version+9); !errors.Is(err, domain.ErrConflict) {
-		t.Fatalf("错误版本号必须冲突: %v", err)
+	if _, err := e.svc.Master.ActivateRevision(e.ctx, rev.ID, rev.Version+1); !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("陈旧版本必须冲突: %v", err)
 	}
 }

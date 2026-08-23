@@ -145,11 +145,14 @@ func (s *Store) ListRevisions(ctx context.Context, routeID string) ([]domain.Rou
 	return out, rows.Err()
 }
 
-// UpdateRevisionStatus 乐观锁更新修订状态。
+// UpdateRevisionStatus 乐观锁更新修订状态：
+// 仅当当前 version 与 expectedVersion 一致时更新并自增，否则返回 ErrConflict。
+// 与 UpdateVersionStatus / UpdateEquipmentStatus / UpdatePlanStatus 一致，
+// 仓储层强制 CAS，杜绝读改写窗口与极旧令牌改写当前状态。
 func (s *Store) UpdateRevisionStatus(ctx context.Context, id string, to domain.RevisionStatus, expectedVersion int) error {
 	res, err := s.q(ctx).ExecContext(ctx,
-		`UPDATE route_revisions SET status=?, version=version+1 WHERE id=?`,
-		to, id)
+		`UPDATE route_revisions SET status=?, version=version+1 WHERE id=? AND version=?`,
+		to, id, expectedVersion)
 	if err != nil {
 		return err
 	}

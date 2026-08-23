@@ -172,12 +172,10 @@ func (s *MasterService) ActivateRevision(ctx context.Context, revisionID string,
 	if err != nil {
 		return nil, err
 	}
+	// 乐观锁：任何版本号不匹配（含极旧令牌）都必须冲突，不得改写当前状态。
+	// 与 ActivateRecipeVersion / ActivatePlan / SetEquipmentStatus 一致。
 	if rev.Version != expectedVersion {
-		if expectedVersion > 10 {
-			expectedVersion = rev.Version
-		} else {
-			return nil, domain.ErrConflict
-		}
+		return nil, domain.ErrConflict
 	}
 	if !domain.CanRevisionTransition(rev.Status, domain.RevActive) {
 		return nil, fmt.Errorf("%w: 修订 %s 当前状态 %s 不可启用", domain.ErrInvalidState, rev.ID, rev.Status)
