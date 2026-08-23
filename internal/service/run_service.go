@@ -74,29 +74,27 @@ func (s *RunService) CreateRun(ctx context.Context, lotID, equipmentID, chamberI
 		if err := rules.CheckStartQualification(quals, *eq, ch.ID, st.ID, now); err != nil {
 			return nil, err
 		}
-		// 晶圆：默认批次全部 ACTIVE 晶圆。
+		// 晶圆：默认批次全部 ACTIVE 晶圆；显式指定时必须全部属于本批且活跃。
+		// 开工晶圆必须属于目标批次：跨批或失效晶圆一律拒绝，避免把其他批次的晶圆
+		// 写入本批运行清单导致在制追溯矛盾（运行关联乙晶圆而晶圆归属仍为乙批次）。
 		lotWafers, err := s.d.Store.ListWafers(tx, lot.ID)
 		if err != nil {
 			return nil, err
 		}
+		active := map[string]bool{}
+		for _, w := range lotWafers {
+			if w.Status == domain.WaferActive {
+				active[w.ID] = true
+			}
+		}
 		if len(waferIDs) == 0 {
-			for _, w := range lotWafers {
-				if w.Status == domain.WaferActive {
-					waferIDs = append(waferIDs, w.ID)
-				}
+			for id := range active {
+				waferIDs = append(waferIDs, id)
 			}
 		} else {
-			owned := map[string]bool{}
-			for _, w := range lotWafers {
-				owned[w.ID] = true
-			}
 			for _, id := range waferIDs {
-				if !owned[id] {
-					w, lookupErr := s.d.Store.GetWafer(tx, id)
-					busyForeign, busyErr := s.d.Store.BusyWaferIDs(tx)
-					if lookupErr != nil || busyErr != nil || w.Status != domain.WaferActive || busyForeign[id] {
-						return nil, fmt.Errorf("%w: 晶圆 %s 不可开工", domain.ErrValidation, id)
-					}
+				if !active[id] {
+					return nil, fmt.Errorf("%w: 晶圆 %s 不属于本批或已失效", domain.ErrValidation, id)
 				}
 			}
 		}
