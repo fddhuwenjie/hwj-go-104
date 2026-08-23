@@ -131,3 +131,65 @@ func TestOptimisticLockConflict(t *testing.T) {
 		t.Fatalf("错误版本号必须冲突: %v", err)
 	}
 }
+
+// TestSetEquipmentStatusConcurrentInterleave 设备停机并发交错：
+// 终端 A、B 同时读到 v1/ACTIVE。A 先停机成功推进到 v2/DOWN；
+// B 仍用打开记录时的旧版本 v1 再次提交停机（目标状态相同）。
+// 修复前：相同目标状态被当作“无变化”绕过乐观锁，仓储 UPDATE 不校验版本，
+//   操作成功且把版本推进到 v3（无意义的空写）。
+// 修复后：版本号不匹配即冲突，与目标状态是否相同无关，B 必须拿到 ErrConflict，
+//   版本不得被推进；随后 B 用更到的 v2 改回启用才会成功。
+func TestSetEquipmentStatusConcurrentInterleave(t *testing.T) {
+	e := newTestEnv(t)
+	e.setupMaster()
+	e.activateVersions()
+	e.setupEquipment(false)
+
+	eq := e.eq1
+	if eq.Status != domain.EquipActive || eq.Version != 1 {
+		t.Fatalf("初始状态错误: status=%s version=%d", eq.Status, eq.Version)
+	}
+
+	// 两个终端各自读到同一快照 v1/ACTIVE（模拟打开记录）。
+	stale := eq.Version // 1
+
+	// 终端 A 先停机成功，版本 v1 -> v2。
+	if _, err := e.svc.Master.SetEquipmentStatus(e.ctx, eq.ID, domain.EquipDown, stale); err != nil {
+		t.Fatalf("终端A停机: %v", err)
+	}
+	current, err := e.svc.Master.GetEquipment(e.ctx, eq.ID)
+	if err != nil {
+		t.Fatalf("查询: %v", err)
+	}
+	if current.Status != domain.EquipDown || current.Version != 2 {
+		t.Fatalf("终端A停机后状态错误: status=%s version=%d", current.Status, current.Version)
+	}
+
+	// 终端 B 用打开时的旧版本 v1 再次提交停机（相同目标状态）。
+	// 修复前：相同目标状态被绕过，操作成功并推进版本到 3。
+	// 修复后：版本不匹配，必须冲突，版本不得被推进。
+	if _, err := e.svc.Master.SetEquipmentStatus(e.ctx, eq.ID, domain.EquipDown, stale); !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("相同目标状态的陈旧版本必须冲突，不得绕过乐观锁: %v", err)
+	}
+	afterB, err := e.svc.Master.GetEquipment(e.ctx, eq.ID)
+	if err != nil {
+		t.Fatalf("查询B后: %v", err)
+	}
+	if afterB.Version != 2 || afterB.Status != domain.EquipDown {
+		t.Fatalf("陈旧版本提交不得推进版本或改变状态: status=%s version=%d", afterB.Status, afterB.Version)
+	}
+
+	// 终端 B 拿到正确版本 v2 后改回启用，应成功并推进到 v3。
+	restored, err := e.svc.Master.SetEquipmentStatus(e.ctx, eq.ID, domain.EquipActive, afterB.Version)
+	if err != nil {
+		t.Fatalf("终端B改回启用: %v", err)
+	}
+	if restored.Status != domain.EquipActive || restored.Version != 3 {
+		t.Fatalf("改回启用后状态错误: status=%s version=%d", restored.Status, restored.Version)
+	}
+
+	// 终端 A 持有的 v2 已过期，改回启用必须冲突。
+	if _, err := e.svc.Master.SetEquipmentStatus(e.ctx, eq.ID, domain.EquipActive, afterB.Version); !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("陈旧版本改回启用必须冲突: %v", err)
+	}
+}

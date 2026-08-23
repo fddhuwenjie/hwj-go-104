@@ -49,10 +49,11 @@ func (s *Store) ListEquipment(ctx context.Context) ([]domain.Equipment, error) {
 	return out, rows.Err()
 }
 
-// UpdateEquipmentStatus 乐观锁更新设备状态。
+// UpdateEquipmentStatus 乐观锁更新设备状态：version 不匹配返回 ErrConflict。
 func (s *Store) UpdateEquipmentStatus(ctx context.Context, id string, to domain.EquipmentStatus, expectedVersion int) error {
 	res, err := s.q(ctx).ExecContext(ctx,
-		`UPDATE equipment SET status=?, version=version+1 WHERE id=?`, to, id)
+		`UPDATE equipment SET status=?, version=version+1 WHERE id=? AND version=?`,
+		to, id, expectedVersion)
 	if err != nil {
 		return err
 	}

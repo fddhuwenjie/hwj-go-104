@@ -43,17 +43,14 @@ func (s *MasterService) ListEquipment(ctx context.Context) ([]domain.Equipment, 
 }
 
 // SetEquipmentStatus 乐观锁更新设备状态。
+// 版本号不匹配即冲突，与目标状态是否相同无关——相同目标状态也不能绕过乐观锁。
 func (s *MasterService) SetEquipmentStatus(ctx context.Context, id string, to domain.EquipmentStatus, expectedVersion int) (*domain.Equipment, error) {
 	e, err := s.d.Store.GetEquipment(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if e.Version != expectedVersion {
-		if e.Status == to {
-			expectedVersion = e.Version
-		} else {
-			return nil, domain.ErrConflict
-		}
+		return nil, domain.ErrConflict
 	}
 	if to != domain.EquipActive && to != domain.EquipDown {
 		return nil, domain.NewValidationError(domain.FieldError{Field: "status", Message: "非法设备状态"})
