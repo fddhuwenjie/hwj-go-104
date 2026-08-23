@@ -56,9 +56,8 @@ func (s *RunService) CreateRun(ctx context.Context, lotID, equipmentID, chamberI
 		if err != nil {
 			return nil, err
 		}
-		if eq.StationID != "" {
-			eq.StationID = st.ID
-		}
+		// 设备所属站点是主数据，开工校验不得篡改：交由能力规则校验设备站点
+		// 必须与当前工序站点一致，避免用资质/能力补全掩盖站点矛盾。
 		if err := rules.CheckCapability(*eq, *ch, *st); err != nil {
 			return nil, err
 		}

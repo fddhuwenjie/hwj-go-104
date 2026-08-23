@@ -15,6 +15,11 @@ func CheckCapability(eq domain.Equipment, ch domain.Chamber, st domain.Station) 
 	if eq.StationID == "" {
 		return domain.ErrCapability
 	}
+	// 设备所属站点必须与当前工序站点一致：跨站点设备即便腔体能力与
+	// 资质补全，也不得在本工序开工，避免运行归属与冻结站点矛盾。
+	if eq.StationID != st.ID {
+		return domain.ErrCapability
+	}
 	if ch.EquipmentID != eq.ID {
 		return domain.ErrCapability
 	}
