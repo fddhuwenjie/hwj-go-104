@@ -1,0 +1,16 @@
+# 版本控制
+.git
+.gitignore
+
+# 本地构建产物
+bin/
+*.db
+*.db-shm
+*.db-wal
+
+# 编辑器与系统文件
+.DS_Store
+*.swp
+
+# 文档不影响构建（保留注释说明，可按需放开）
+# docs/
