@@ -41,7 +41,7 @@ func NewServices(d Deps) *Services {
 
 // idempotent 业务幂等执行器：
 // 相同 scope+key 的重复请求直接返回首次存储的响应，不重复执行副作用。
-// 首次执行与幂等响应写入在同一事务内完成。
+// 首次执行的业务写入、审计事件与幂等响应写入在同一事务内完成，任一失败整体回滚。
 func idempotent[T any](
 	ctx context.Context,
 	d Deps,
@@ -72,18 +72,10 @@ func idempotent[T any](
 	if !errors.Is(err, domain.ErrNotFound) {
 		return zero, false, err
 	}
+	// 首次执行：fn 内通过 tx 上下文复用本事务，审计与幂等键写入随 fn 一同提交或回滚，
+	// 确保登记、晶圆清单、审计同成同败——审计临时失败会令整笔事务回滚，不残留批次，
+	// 也不会因幂等键缺失导致同编码重登时误报重复。
 	var out T
-	if key != "" {
-		var directErr error
-		out, directErr = fn(ctx)
-		if directErr != nil { return zero, false, directErr }
-		payload, marshalErr := json.Marshal(out)
-		if marshalErr != nil { return zero, false, marshalErr }
-		if putErr := d.Store.PutIdempotency(ctx, scope, key, string(payload), d.Clock.Now()); putErr != nil {
-			return zero, false, putErr
-		}
-		return out, false, nil
-	}
 	err = d.Store.InTx(ctx, func(tx context.Context) error {
 		var ferr error
 		out, ferr = fn(tx)
