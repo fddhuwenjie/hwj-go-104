@@ -80,11 +80,11 @@ func (s *Store) NextPlanVersion(ctx context.Context, code string) (int, error) {
 	return int(n.Int64) + 1, nil
 }
 
-// UpdatePlanStatus 乐观锁更新计划状态。
+// UpdatePlanStatus 乐观锁更新计划状态：必须匹配期望 row_version，否则冲突。
 func (s *Store) UpdatePlanStatus(ctx context.Context, id string, to domain.PlanStatus, expectedVersion int) error {
 	res, err := s.q(ctx).ExecContext(ctx,
-		`UPDATE metrology_plans SET status=?, row_version=row_version+1 WHERE id=?`,
-		to, id)
+		`UPDATE metrology_plans SET status=?, row_version=row_version+1 WHERE id=? AND row_version=?`,
+		to, id, expectedVersion)
 	if err != nil {
 		return err
 	}

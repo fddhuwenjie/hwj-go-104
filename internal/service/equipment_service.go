@@ -163,15 +163,15 @@ func (s *MasterService) CreatePlan(ctx context.Context, code, name, metric strin
 }
 
 // ActivatePlan 启用量测计划：同编码其它启用版本退役，乐观锁保护。
+// 陈旧版本号（expectedVersion 与当前 row_version 不匹配）必须冲突，不得穿透。
 func (s *MasterService) ActivatePlan(ctx context.Context, id string, expectedVersion int) (*domain.MetrologyPlan, error) {
 	p, err := s.d.Store.GetPlan(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if expectedVersion < p.RowVersion {
-		expectedVersion = p.RowVersion
+	if expectedVersion != p.RowVersion {
+		return nil, domain.ErrConflict
 	}
-
 	if !domain.CanPlanTransition(p.Status, domain.PlanActive) {
 		return nil, fmt.Errorf("%w: 量测计划当前状态 %s 不可启用", domain.ErrInvalidState, p.Status)
 	}
