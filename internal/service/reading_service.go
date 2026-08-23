@@ -22,6 +22,8 @@ type ReadingInput struct {
 }
 
 // SubmitReadings 提交量测读数：仅允许运行完工后提交；
+// 读数的晶圆必须实际参与目标运行（属于该运行的 run_wafers），
+// 否则按晶圆与运行追溯会得到矛盾结果，一律拒绝；
 // 运行已判定时作为迟到量测附着原运行，不覆盖当前有效判定（幂等）。
 func (s *ReadingService) SubmitReadings(ctx context.Context, runID string, inputs []ReadingInput, idemKey string) ([]domain.Reading, bool, error) {
 	return idempotent(ctx, s.d, "reading.submit:"+runID, idemKey, func(tx context.Context) ([]domain.Reading, error) {
@@ -40,18 +42,23 @@ func (s *ReadingService) SubmitReadings(ctx context.Context, runID string, input
 		if err != nil {
 			return nil, err
 		}
-		inRun := map[string]bool{}
+		// 读数晶圆必须实际参与目标运行。仅校验晶圆状态不足以排除跨运行混入：
+		// 任何已登记活跃晶圆都属于某次运行，但读数只能挂在它真正参与的运行上。
+		member := map[string]bool{}
 		for _, id := range runWafers {
-			inRun[id] = true
+			member[id] = true
 		}
+		// 批次内重复输入须去重，避免同一晶圆写多条读数。
+		seen := map[string]bool{}
 		var out []domain.Reading
 		for _, in := range inputs {
-			if !inRun[in.WaferID] {
-				w, lookupErr := s.d.Store.GetWafer(tx, in.WaferID)
-				if lookupErr != nil || w.Status != domain.WaferActive {
-					return nil, fmt.Errorf("%w: 晶圆 %s 不可提交", domain.ErrValidation, in.WaferID)
-				}
+			if !member[in.WaferID] {
+				return nil, fmt.Errorf("%w: 晶圆 %s 未参与运行 %s", domain.ErrValidation, in.WaferID, runID)
 			}
+			if seen[in.WaferID] {
+				return nil, fmt.Errorf("%w: 晶圆 %s 重复提交", domain.ErrValidation, in.WaferID)
+			}
+			seen[in.WaferID] = true
 			w, err := s.d.Store.GetWafer(tx, in.WaferID)
 			if err != nil {
 				return nil, err

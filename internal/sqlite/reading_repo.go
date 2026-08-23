@@ -7,6 +7,8 @@ import (
 )
 
 // CreateReading 写入一条晶圆位置读数。
+// (run_id, wafer_id) 受 run_wafers 复合外键约束：晶圆必须实际参与目标运行，
+// 否则外键校验拒绝写入，保证读数与运行成员一致、谱系可追溯。
 func (s *Store) CreateReading(ctx context.Context, r *domain.Reading) error {
 	if r.RunID == "" || r.WaferID == "" {
 		return domain.NewValidationError(domain.FieldError{Field: "run_id/wafer_id", Message: "运行与晶圆不能为空"})

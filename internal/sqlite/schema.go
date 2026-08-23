@@ -193,7 +193,8 @@ CREATE TABLE IF NOT EXISTS readings (
   value REAL NOT NULL,
   late INTEGER NOT NULL DEFAULT 0,
   sealed INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (run_id, wafer_id) REFERENCES run_wafers(run_id, wafer_id)
 );
 CREATE INDEX IF NOT EXISTS idx_readings_run ON readings(run_id);
 
