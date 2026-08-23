@@ -406,6 +406,8 @@ func (s *LotService) Scrap(ctx context.Context, lotID, reason string, idemKey st
 }
 
 // Restore 恢复原路线：复判放行后批次回到当前站点排队（幂等）。
+// 任何批次必须先完成复判（关闭其自身及谱系内的全部开放暂扣）才能恢复，
+// 因此恢复前对根批与子批一律校验暂扣阻断，存在开放暂扣即拒绝。
 func (s *LotService) Restore(ctx context.Context, lotID string, idemKey string) (*domain.Lot, bool, error) {
 	return idempotent(ctx, s.d, "lot.restore:"+lotID, idemKey, func(tx context.Context) (*domain.Lot, error) {
 		lot, err := s.d.Store.GetLot(tx, lotID)
@@ -415,10 +417,9 @@ func (s *LotService) Restore(ctx context.Context, lotID string, idemKey string) 
 		if lot.Status != domain.LotOnHold {
 			return nil, fmt.Errorf("%w: 仅暂扣批次可恢复原路线", domain.ErrInvalidState)
 		}
-		if lot.ParentLotID != "" {
-			if err := holdBlockingCheck(tx, s.d, lot.ID); err != nil {
-				return nil, err
-			}
+		// 先校验暂扣阻断，保证未复判的开放暂扣（自身或谱系内）阻止状态回退。
+		if err := holdBlockingCheck(tx, s.d, lot.ID); err != nil {
+			return nil, err
 		}
 		now := s.d.Clock.Now()
 		lot.Status = domain.LotQueued

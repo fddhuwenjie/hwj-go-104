@@ -114,14 +114,15 @@ func audit(ctx context.Context, d Deps, txTag, entity, entityID, action string, 
 
 // holdBlockingCheck 校验批次及其全部后代、全部祖先不存在未关闭暂扣：
 // 父批暂扣阻断子批，子批暂扣阻断自身及其后代。
+// 批次自身必须始终纳入阻断集合：无后代的根批或叶子批同样要校验自身暂扣，
+// 否则 ON_HOLD 批次的恢复/进站等操作会穿透自身开放暂扣（根批无后代时旧实现遗漏自身）。
 func holdBlockingCheck(ctx context.Context, d Deps, lotID string) error {
-	ids, err := d.Store.DescendantLotIDs(ctx, lotID)
+	ids := []string{lotID}
+	descendants, err := d.Store.DescendantLotIDs(ctx, lotID)
 	if err != nil {
 		return err
 	}
-	if len(ids) > 0 {
-		ids = append([]string{lotID}, ids...)
-	}
+	ids = append(ids, descendants...)
 	// 沿父链向上收集祖先。
 	current := lotID
 	for depth := 0; depth < 100; depth++ {
